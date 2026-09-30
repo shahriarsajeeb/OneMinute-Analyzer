@@ -1,0 +1,39 @@
+{
+  "name": "oneminute-analyzer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "proxy:check": "node --conditions=react-server --import tsx scripts/check-proxy.ts",
+    "test:proxy": "node --conditions=react-server --import tsx --test tests/proxy.test.ts",
+    "browser:install": "playwright install chromium",
+    "browser:check": "node --conditions=react-server --import tsx scripts/check-browser.ts",
+    "test:browser": "node --conditions=react-server --import tsx --test tests/browser.test.ts",
+    "test:assertions": "node --import tsx --test tests/assertions.browser.ts",
+    "test:prices": "node --import tsx --test tests/prices.test.ts",
+    "test:trackers": "node --import tsx --test tests/trackers.test.ts"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "clsx": "^2.1.1",
+    "ipaddr.js": "^2.5.0",
+    "lucide-react": "^0.468.0",
+    "next": "^15.3.0",
+    "playwright": "^1.63.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1",
+    "tailwindcss": "^4.0.0",
+    "undici": "^6.29.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.7.0"
+  }
+}
