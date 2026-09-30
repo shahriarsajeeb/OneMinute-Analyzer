@@ -1,5 +1,7 @@
 import { isCountryCode } from "./countries";
+import { parseExpectedPrice } from "./prices";
 export const ruleKinds = [
+  "price",
   "contains",
   "not-contains",
   "text",
@@ -12,11 +14,15 @@ export type RuleKind = (typeof ruleKinds)[number];
 /** Kinds that search visible text; an element only narrows where they look. */
 export const scopeOptional = (kind: RuleKind) =>
   kind === "language" ||
+  kind === "price" ||
   kind === "contains" ||
   kind === "not-contains" ||
   kind === "no-trackers";
 export const needsExpected = (kind: RuleKind) =>
-  kind === "text" || kind === "language" || kind === "contains" || kind === "not-contains";
+  kind === "text" ||
+  kind === "language" ||
+  kind === "price" ||
+  kind === "contains" || kind === "not-contains";
 export type RegionalRule = {
   id: string;
   name: string;
@@ -60,6 +66,8 @@ export function validateRules(value: unknown): RegionalRule[] {
       throw new Error("Choose a CSS selector for each element check.");
     if (needsExpected(item.kind) && !item.expected.trim())
       throw new Error("Text and language checks need an expected value.");
+    if (item.kind === "price" && !parseExpectedPrice(item.expected))
+      throw new Error("Enter one price, e.g. $39.99, ฿1,000, BRL 149 or 39.99.");
     ids.add(item.id);
     return {
       id: item.id,

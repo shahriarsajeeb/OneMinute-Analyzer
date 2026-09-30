@@ -31,6 +31,8 @@ function expectedLabel(rule: RegionalRule) {
       return "Absent or hidden";
     case "no-trackers":
       return "No tracking before consent";
+    case "price":
+      return `Price ${rule.expected}`;
     case "contains":
       return `Shows “${rule.expected}”`;
     case "not-contains":

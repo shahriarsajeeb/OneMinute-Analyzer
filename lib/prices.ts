@@ -151,3 +151,42 @@ export function distinctPrices(prices: ObservedPrice[]) {
     ...new Map(prices.map((price) => [formatPrice(price), price])).values(),
   ];
 }
+
+export type ExpectedPrice = { amount: number; candidates: CurrencyCode[] | null };
+
+/** "$39.99", "฿1,000", "BRL 149" or a bare amount such as "39.99" (any currency). */
+export function parseExpectedPrice(value: string): ExpectedPrice | null {
+  const text = value.trim();
+  const prices = findPrices(text);
+  if (prices.length === 1)
+    return { amount: prices[0].amount, candidates: prices[0].candidates };
+  if (prices.length > 1) return null;
+  const amount = parseAmount(text);
+  return amount === null ? null : { amount, candidates: null };
+}
+
+const sameAmount = (a: number, b: number) => Math.abs(a - b) < 0.005;
+
+/**
+ * Compares prices by amount and currency, never as text, so "30" does not match
+ * "30-minute" or "$39.99". A shared symbol such as "$" counts as a match for any
+ * currency it can stand for, and is reported as ambiguous.
+ */
+export function matchPrice(expected: ExpectedPrice, observed: ObservedPrice[]) {
+  const matches = observed.filter(
+    (price) =>
+      sameAmount(price.amount, expected.amount) &&
+      (!expected.candidates ||
+        price.candidates.some((code) => expected.candidates!.includes(code))),
+  );
+  const exact = matches.find(
+    (price) =>
+      !expected.candidates ||
+      price.candidates.length === 1 ||
+      expected.candidates.length > 1,
+  );
+  const match = exact ?? matches[0];
+  return match
+    ? { match, ambiguous: !exact }
+    : null;
+}

@@ -4,7 +4,13 @@ import {
   type AssertionResult,
   type RegionalRule,
 } from "@/lib/regional-rules";
-import { distinctPrices, findPrices, formatPrice } from "@/lib/prices";
+import {
+  distinctPrices,
+  findPrices,
+  formatPrice,
+  matchPrice,
+  parseExpectedPrice,
+} from "@/lib/prices";
 
 const fold = (text: string) => normalizeText(text).toLowerCase();
 
@@ -15,11 +21,11 @@ function excerpt(text: string, index: number, length: number) {
   return `${start ? "…" : ""}${text.slice(start, end)}${end < text.length ? "…" : ""}`;
 }
 
-async function observeText(
+/** Visible text of the page, or of the one element the rule narrows to. */
+async function visibleText(
   page: Page,
   rule: RegionalRule,
-): Promise<AssertionResult> {
-  const where = rule.selector ? "the selected element" : "the page";
+): Promise<{ text: string } | AssertionResult> {
   let scope = page.locator("body");
   if (rule.selector) {
     scope = page.locator(`css=${rule.selector}`);
@@ -35,7 +41,57 @@ async function observeText(
       };
   }
   // innerText contains rendered text only: hidden elements are excluded.
-  const text = normalizeText(await scope.innerText({ timeout: 1000 }));
+  return { text: normalizeText(await scope.innerText({ timeout: 1000 })) };
+}
+
+async function observePrice(
+  page: Page,
+  rule: RegionalRule,
+): Promise<AssertionResult> {
+  const where = rule.selector ? "the selected element" : "the page";
+  const read = await visibleText(page, rule);
+  if (!("text" in read)) return read;
+  const expected = parseExpectedPrice(rule.expected);
+  if (!expected)
+    return {
+      rule,
+      outcome: "inconclusive",
+      observed: "Not evaluated",
+      reason: "The expected price could not be read",
+    };
+  const shown = distinctPrices(findPrices(read.text));
+  const found = matchPrice(expected, shown);
+  if (found)
+    return {
+      rule,
+      // A shared symbol confirms the amount, not the expected currency.
+      outcome: found.ambiguous ? "inconclusive" : "pass",
+      observed: formatPrice(found.match),
+      reason: found.ambiguous
+        ? `The amount matches, but “${found.match.marker}” is used by several currencies, so the currency could not be confirmed. Expect “${found.match.marker}${found.match.raw}” to check the displayed price only.`
+        : `Price found on ${where}`,
+    };
+  const list = shown.slice(0, 6).map(formatPrice);
+  return {
+    rule,
+    outcome: "fail",
+    observed: list.length
+      ? `Prices on ${where}: ${list.join(", ")}`
+      : `No prices found on ${where}`,
+    reason: expected.candidates
+      ? `No price with this amount and currency is visible on ${where}`
+      : `No price with this amount is visible on ${where}`,
+  };
+}
+
+async function observeText(
+  page: Page,
+  rule: RegionalRule,
+): Promise<AssertionResult> {
+  const where = rule.selector ? "the selected element" : "the page";
+  const read = await visibleText(page, rule);
+  if (!("text" in read)) return read;
+  const text = read.text;
   const index = fold(text).indexOf(fold(rule.expected));
   const found = index >= 0;
   const matches = rule.kind === "contains" ? found : !found;
@@ -76,6 +132,7 @@ export async function observeRule(
       reason: "Tracker checks are evaluated after the observation window",
     };
   try {
+    if (rule.kind === "price") return await observePrice(page, rule);
     if (rule.kind === "contains" || rule.kind === "not-contains")
       return await observeText(page, rule);
     if (rule.kind === "language") {

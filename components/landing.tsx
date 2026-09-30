@@ -60,10 +60,16 @@ export function Landing() {
           setRules(
             saved.rules.flatMap((rule: unknown) => {
               try {
+                // Only the shape is checked here; unfinished values stay editable.
                 const [valid] = validateRules([
-                  { ...(rule as RegionalRule), name: (rule as RegionalRule).name || "Check", selector: (rule as RegionalRule).selector || "x", expected: (rule as RegionalRule).expected || "x" },
+                  { ...(rule as RegionalRule), name: (rule as RegionalRule).name || "Check", selector: (rule as RegionalRule).selector || "x", expected: "1" },
                 ]);
-                return valid ? [{ ...(rule as RegionalRule), kind: valid.kind }] : [];
+                // Price checks used to be saved as plain text searches.
+                const kind =
+                  valid.kind === "contains" && valid.name === "Price"
+                    ? "price"
+                    : valid.kind;
+                return valid ? [{ ...(rule as RegionalRule), kind }] : [];
               } catch {
                 return [];
               }

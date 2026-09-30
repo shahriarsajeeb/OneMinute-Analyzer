@@ -52,6 +52,34 @@ test("page-text checks find visible text anywhere, report shown prices on a miss
   }
 });
 
+test("price checks read prices on the page instead of matching digits in other text", async () => {
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage();
+    await page.setContent(`<html><body>
+      <h1>Get the Complete Source Code</h1><div class="card">$39.99</div>
+      <p>2 free 30-minute sessions are included with your purchase.</p></body></html>`);
+    const base: RegionalRule = { id: "p", country: "sg", name: "Price", kind: "price", selector: "", expected: "30" };
+    const [thirty, exact, wrongCurrency, scopedMiss] = await runAssertions(page, [
+      base,
+      { ...base, id: "q", expected: "$39.99" },
+      { ...base, id: "r", expected: "S$39.99" },
+      { ...base, id: "s", selector: "p", expected: "39.99" },
+    ], 100);
+    assert.equal(thirty.outcome, "fail");
+    assert.equal(thirty.observed, "Prices on the page: $39.99");
+    assert.equal(exact.outcome, "pass");
+    assert.equal(exact.observed, "$39.99");
+    // "$" can mean SGD or USD: the amount matches but the currency is unconfirmed.
+    assert.equal(wrongCurrency.outcome, "inconclusive");
+    assert.match(wrongCurrency.reason, /currency could not be confirmed/);
+    assert.equal(scopedMiss.outcome, "fail");
+    assert.equal(scopedMiss.observed, "No prices found on the selected element");
+  } finally {
+    await browser.close();
+  }
+});
+
 test("detects bot walls on short pages but not a long page that mentions access denied", async () => {
   const { detectAccessIssue } = await import("../lib/server/browser/assertions");
   const browser = await chromium.launch();

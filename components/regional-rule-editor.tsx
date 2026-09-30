@@ -8,6 +8,7 @@ import {
   type RegionalRule,
 } from "@/lib/regional-rules";
 import { locations } from "@/lib/mock-data";
+import { parseExpectedPrice } from "@/lib/prices";
 
 type Preset = {
   label: string;
@@ -18,7 +19,7 @@ const presets: Preset[] = [
   {
     label: "Price",
     hint: "The page shows this price, e.g. ฿1,000",
-    rule: { kind: "contains", name: "Price", selector: "", expected: "" },
+    rule: { kind: "price", name: "Price", selector: "", expected: "" },
   },
   {
     label: "Text on page",
@@ -57,6 +58,7 @@ const presets: Preset[] = [
   },
 ];
 const kindLabels: Record<RegionalRule["kind"], string> = {
+  price: "Page shows price",
   contains: "Page shows",
   "not-contains": "Page does not show",
   text: "Element shows exact text",
@@ -66,6 +68,7 @@ const kindLabels: Record<RegionalRule["kind"], string> = {
   "no-trackers": "No trackers before consent",
 };
 const defaultNames: Record<RegionalRule["kind"], string> = {
+  price: "Price",
   contains: "Text on page",
   "not-contains": "Text not on page",
   text: "Text",
@@ -75,6 +78,8 @@ const defaultNames: Record<RegionalRule["kind"], string> = {
   "no-trackers": "No trackers before consent",
 };
 const helpText: Record<RegionalRule["kind"], string> = {
+  price:
+    "Reads the prices shown on the page and compares the amount, e.g. $39.99, ฿1,000 or BRL 149. Include the currency to check it too; a bare amount like 39.99 matches any currency.",
   contains:
     "Passes when this text is visible anywhere on the page (case and spacing ignored). Add an element only to narrow the search.",
   "not-contains":
@@ -130,10 +135,15 @@ export function CheckSetup({
     } catch (error) {
       const missingElement = (rule: RegionalRule) =>
         !scopeOptional(rule.kind) && !rule.selector.trim();
+      const badPrice = (rule: RegionalRule) =>
+        rule.kind === "price" &&
+        !!rule.expected.trim() &&
+        !parseExpectedPrice(rule.expected);
       const broken = named.find(
         (rule) =>
           missingElement(rule) ||
-          (needsExpected(rule.kind) && !rule.expected.trim()),
+          (needsExpected(rule.kind) && !rule.expected.trim()) ||
+          badPrice(rule),
       );
       if (broken) setActive(broken.country);
       setError(
@@ -141,7 +151,9 @@ export function CheckSetup({
           ? `Finish “${broken.name}” for ${locations.find((item) => item.id === broken.country)?.name}: ${
               missingElement(broken)
                 ? "choose the element to inspect."
-                : "enter the expected value."
+                : badPrice(broken)
+                  ? "enter one price, e.g. $39.99, ฿1,000 or BRL 149."
+                  : "enter the expected value."
             }`
           : error instanceof Error
             ? error.message
@@ -286,14 +298,18 @@ export function CheckSetup({
                 </label>
                 {needsExpected(rule.kind) && (
                   <label>
-                    {rule.kind === "language" ? "Language" : "Text"}
+                    {rule.kind === "language"
+                      ? "Language"
+                      : rule.kind === "price"
+                        ? "Price"
+                        : "Text"}
                     <input
                       value={rule.expected}
                       list={rule.kind === "language" ? "language-codes" : undefined}
                       placeholder={
                         rule.kind === "language"
                           ? "pt-BR"
-                          : rule.name === "Price"
+                          : rule.kind === "price"
                             ? "฿1,000"
                             : "Regional pricing for Thailand"
                       }
